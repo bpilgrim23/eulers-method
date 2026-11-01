@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Euler's Method — Numerical Solver</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #1a2233;
+    --panel-2: #212c44;
+    --text: #e8ecf5;
+    --muted: #93a1bd;
+    --accent: #4f8cff;
+    --accent-2: #36d399;
+    --danger: #ff6b6b;
+    --border: #2c3a5c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(1200px 600px at 20% -10%, #1c2a4a 0%, var(--bg) 55%);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 28px 16px 60px;
+  }
+  h1 {
+    font-size: 1.7rem;
+    font-weight: 650;
+    margin: 0 0 4px;
+    letter-spacing: 0.2px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    color: var(--muted);
+    margin: 0 0 24px;
+    font-size: 0.95rem;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    width: 100%;
+    max-width: 1150px;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  .card h2 {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1.4px;
+    color: var(--muted);
+    margin: 0 0 16px;
+  }
+  .field { margin-bottom: 16px; }
+  .field label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  .field label b { color: var(--text); font-weight: 600; }
+  .field .hint { font-size: .75rem; color: #6b7a9c; margin-top: 4px; }
+  input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel-2);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-family: "Cascadia Code", Consolas, monospace;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input[type="text"]:focus, input[type="number"]:focus { border-color: var(--accent); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  button.run {
+    width: 100%;
+    margin-top: 4px;
+    padding: 12px;
+    border: none;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), #7c5cff);
+    color: white;
+    font-size: 1rem;
+    font-weight: 650;
+    cursor: pointer;
+    transition: transform .1s, filter .15s;
+  }
+  button.run:hover { filter: brightness(1.12); }
+  button.run:active { transform: translateY(1px); }
+  .status {
+    margin-top: 12px;
+    font-size: .85rem;
+    min-height: 1.2em;
+  }
+  .status.error { color: var(--danger); }
+  .status.ok { color: var(--accent-2); }
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .chk {
+    font-size: .92rem;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .chk input { accent-color: #e879f9; width: 16px; height: 16px; cursor: pointer; }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: .9rem;
+    transition: background .15s, border-color .15s;
+  }
+  .btn-ghost:hover { background: rgba(79,140,255,.12); border-color: var(--accent); }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .graph-wrap {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: #101828;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  canvas { width: 100%; height: 100%; display: block; }
+  .table-wrap {
+    margin-top: 16px;
+    max-height: 240px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: .85rem;
+  }
+  th, td { padding: 7px 14px; text-align: right; }
+  th {
+    position: sticky;
+    top: 0;
+    background: var(--panel-2);
+    color: var(--muted);
+    font-weight: 600;
+  }
+  tr:nth-child(even) td { background: rgba(255,255,255,.025); }
+  td:first-child, th:first-child { text-align: left; color: var(--muted); }
+  .legend {
+    display: flex;
+    gap: 18px;
+    margin-top: 10px;
+    font-size: .82rem;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .legend .swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    margin-right: 6px;
+    vertical-align: -1px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Euler's <span>Method</span></h1>
+<p class="subtitle">Numerically solve an ODE of the form dy/dx = f(x, y), starting from (x₀, y₀)</p>
+
+<div class="layout">
+  <div class="card">
+    <h2>Parameters</h2>
+
+    <div class="field">
+      <label for="fxy"><b>f(x, y)</b> &nbsp;= &nbsp;dy/dx</label>
+      <input type="text" id="fxy" placeholder="e.g.  x - y" value="x - y" spellcheck="false">
+      <div class="hint">Operators: + - * / ^ (exponent) &nbsp;·&nbsp; Functions: sin cos tan exp log log10 sqrt abs pow &nbsp;·&nbsp; Constants: pi, e</div>
+    </div>
+
+    <div class="field">
+      <div class="row2">
+        <div>
+          <label for="x0"><b>x₀</b> (start x)</label>
+          <input type="number" id="x0" value="0" step="any">
+        </div>
+        <div>
+          <label for="y0"><b>y₀</b> (start y)</label>
+          <input type="number" id="y0" value="1" step="any">
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="row2">
+        <div>
+          <label for="h">Step size <b>h</b></label>
+          <input type="number" id="h" value="0.1" step="any">
+        </div>
+        <div>
+          <label for="n">Steps <b>n</b></label>
+          <input type="number" id="n" value="50" min="1" max="100000" step="1">
+        </div>
+      </div>
+    </div>
+
+    <button class="run" id="runBtn">Run Euler's Method</button>
+    <div class="status" id="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>Results</h2>
+    <div class="controls">
+      <label class="chk" for="rk4Toggle"><input type="checkbox" id="rk4Toggle"> Show RK4 (4th-order) solution</label>
+      <span class="btns">
+        <button class="btn-ghost" id="csvBtn">⬇ Download Euler data (CSV)</button>
+        <button class="btn-ghost" id="csvRkBtn">⬇ Download RK4 data (CSV)</button>
+      </span>
+    </div>
+    <div class="graph-wrap"><canvas id="plot"></canvas></div>
+    <div class="legend" id="legend"></div>
+    <div class="table-wrap">
+      <table id="dataTable">
+        <thead><tr><th>step</th><th>x</th><th>y</th><th>f(x,y)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- Safe formula compiler ---------- */
+const ALLOWED = {
+  sin: Math.sin, cos: Math.cos, tan: Math.tan,
+  asin: Math.asin, acos: Math.acos, atan: Math.atan,
+  sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
+  exp: Math.exp, log: Math.log, log10: Math.log10, log2: Math.log2,
+  sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs,
+  floor: Math.floor, ceil: Math.ceil, round: Math.round,
+  sign: Math.sign, pow: Math.pow, min: Math.min, max: Math.max,
+  pi: Math.PI, e: Math.E
+};
+
+function compileFormula(src) {
+  if (typeof src !== "string" || !src.trim()) throw new Error("Formula is empty.");
+  // Whitelist token check: allow identifiers that exist in ALLOWED,
+  // variables x and y, digits, and a small operator/character set.
+  const tokenRe = /[A-Za-z_]+|\d*\.?\d+(?:[eE][+-]?\d+)?|[+\-*/%^(),\s]/g;
+  let m;
+  const seen = new Set();
+  let end = 0; // exec() resets lastIndex to 0 when it returns null, so track the end manually
+  while ((m = tokenRe.exec(src)) !== null) {
+    end = tokenRe.lastIndex;
+    if (/[A-Za-z_]/.test(m[0][0])) {
+      if (!ALLOWED.hasOwnProperty(m[0]) && m[0] !== "x" && m[0] !== "y") {
+        throw new Error(`Unknown name "${m[0]}" — use x, y, or: ${Object.keys(ALLOWED).join(", ")}`);
+      }
+      seen.add(m[0]);
+    }
+  }
+  if (end < src.length) {
+    const bad = src[end];
+    throw new Error(`Disallowed character "${bad}" in formula.`);
+  }
+  const names = [...seen];
+  // Convert math-style "^" exponentiation to JS "**" (^ is bitwise XOR in JS).
+  // Then wrap signed numeric bases: "-2 ** 3" is a JS syntax error, so rewrite
+  // those as "(-2) ** 3" — but only when the +/- is a sign (preceded by start,
+  // '(', or an operator), not subtraction like "x-2^3" (which is legal as-is).
+  const body = src
+    .replace(/\^/g, " ** ")
+    .replace(/(^|[(+\-*/])([-+])(\s*)((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(\s*)\*\*/g,
+      (m, pre, sign, ws, num, ws2) => `${pre}(${sign}${ws}${num})${ws2}**`)
+    .replace(/[A-Za-z_]+/g, (id) =>
+      (id === "x" || id === "y") ? id : ALLOWED[id]
+    );
+  let fn;
+  try {
+    // eslint-disable-next-line no-new-func
+    fn = new Function("x", "y", `"use strict"; return (${body});`);
+  } catch (err) {
+    throw new Error("Could not parse formula: " + err.message);
+  }
+  // Smoke test
+  const v = fn(1.234, 5.678);
+  if (typeof v !== "number") throw new Error("Formula must evaluate to a number.");
+  if (Number.isNaN(v)) throw new Error("Formula produced NaN for a test point (check division/roots).");
+  return fn;
+}
+
+/* ---------- Euler's method ---------- */
+function euler(fn, x0, y0, h, n) {
+  const rows = [];
+  let x = x0, y = y0;
+  for (let i = 0; i <= n; i++) {
+    const fval = fn(x, y);
+    rows.push({ i, x, y, f: fval });
+    x = x + h;
+    y = y + h * fval;
+  }
+  return rows;
+}
+
+/* ---------- Runge-Kutta 4th order (same grid) ---------- */
+function rk4(fn, x0, y0, h, n) {
+  const rows = [];
+  let x = x0, y = y0;
+  for (let i = 0; i <= n; i++) {
+    rows.push({ i, x, y });
+    const k1 = h * fn(x, y);
+    const k2 = h * fn(x + h / 2, y + k1 / 2);
+    const k3 = h * fn(x + h / 2, y + k2 / 2);
+    const k4 = h * fn(x + h, y + k3);
+    x = x + h;
+    y = y + (k1 + 2 * k2 + 2 * k3 + k4) / 6;
+    if (!isFinite(y)) break; // stop if RK4 diverges; keep points up to here
+  }
+  return rows;
+}
+
+/* ---------- Shared state so CSV / RK4 toggle work on the last run ---------- */
+let state = null; // { fn, x0, y0, h, n, rows }
+
+/* ---------- Plotting (canvas) ---------- */
+function niceTicks(min, max, count = 6) {
+  if (!isFinite(min) || !isFinite(max) || min === max) { min -= 1; max += 1; }
+  const span = max - min;
+  const raw = span / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
+  const start = Math.ceil(min / step) * step;
+  const ticks = [];
+  for (let t = start; t <= max + step * 0.5; t += step) {
+    ticks.push(Math.abs(t) < step * 1e-9 ? 0 : t);
+  }
+  return ticks;
+}
+
+function fmt(v) {
+  if (!isFinite(v)) return String(v);
+  if (Math.abs(v) >= 1e6 || (Math.abs(v) < 1e-4 && v !== 0)) return v.toExponential(3);
+  return Number(v.toPrecision(6)).toString();
+}
+
+function drawPlot(rows, rkRows) {
+  const canvas = document.getElementById("plot");
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  const padL = 62, padR = 20, padT = 20, padB = 42;
+  const pw = W - padL - padR, ph = H - padT - padB;
+
+  let xmin = Math.min(...rows.map(r => r.x));
+  let xmax = Math.max(...rows.map(r => r.x));
+  let ymin = Math.min(...rows.map(r => r.y));
+  let ymax = Math.max(...rows.map(r => r.y));
+  if (xmin === xmax) { xmin -= 1; xmax += 1; }
+  const yspan = ymax - ymin || 1;
+  ymin -= yspan * 0.06; ymax += yspan * 0.06;
+
+  const sx = v => padL + (v - xmin) / (xmax - xmin) * pw;
+  const sy = v => padT + (1 - (v - ymin) / (ymax - ymin)) * ph;
+
+  // Grid + ticks
+  ctx.font = "12px 'Segoe UI', sans-serif";
+  ctx.fillStyle = "#8fa0c4";
+  ctx.strokeStyle = "rgba(255,255,255,0.07)";
+  ctx.lineWidth = 1;
+  for (const t of niceTicks(xmin, xmax, 8)) {
+    const px = sx(t);
+    if (px < padL - 1 || px > W - padR + 1) continue;
+    ctx.beginPath(); ctx.moveTo(px, padT); ctx.lineTo(px, H - padB); ctx.stroke();
+    ctx.textAlign = "center";
+    ctx.fillText(fmt(t), px, H - padB + 18);
+  }
+  for (const t of niceTicks(ymin, ymax, 6)) {
+    const py = sy(t);
+    if (py < padT - 1 || py > H - padB + 1) continue;
+    ctx.beginPath(); ctx.moveTo(padL, py); ctx.lineTo(W - padR, py); ctx.stroke();
+    ctx.textAlign = "right";
+    ctx.fillText(fmt(t), padL - 8, py + 4);
+  }
+
+  // Axes frame
+  ctx.strokeStyle = "rgba(255,255,255,0.25)";
+  ctx.strokeRect(padL, padT, pw, ph);
+
+  // Axis labels
+  ctx.fillStyle = "#aab8d8";
+  ctx.font = "600 13px 'Segoe UI', sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("x", padL + pw / 2, H - 8);
+  ctx.save();
+  ctx.translate(16, padT + ph / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText("y", 0, 0);
+  ctx.restore();
+
+  // Clip to plot area
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(padL, padT, pw, ph);
+  ctx.clip();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(sx(rows[0].x), sy(rows[0].y));
+  for (let i = 1; i < rows.length; i++) ctx.lineTo(sx(rows[i].x), sy(rows[i].y));
+  ctx.strokeStyle = "#4f8cff";
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.stroke();
+
+  // Points (show individually if few, else every k-th)
+  const k = Math.max(1, Math.ceil(rows.length / 200));
+  ctx.fillStyle = "#36d399";
+  for (let i = 0; i < rows.length; i += k) {
+    const r = rows[i];
+    ctx.beginPath();
+    ctx.arc(sx(r.x), sy(r.y), 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Extend the axes to include the RK4 curve when shown
+  if (rkRows && rkRows.length > 1) {
+    xmin = Math.min(xmin, rkRows[0].x);
+    xmax = Math.max(xmax, rkRows[rkRows.length - 1].x);
+    for (const r of rkRows) { if (r.y < ymin) ymin = r.y; if (r.y > ymax) ymax = r.y; }
+  }
+
+  // RK4 overlay (optional)
+  if (rkRows && rkRows.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(sx(rkRows[0].x), sy(rkRows[0].y));
+    for (let i = 1; i < rkRows.length; i++) ctx.lineTo(sx(rkRows[i].x), sy(rkRows[i].y));
+    ctx.strokeStyle = "#e879f9";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([7, 5]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const krk = Math.max(1, Math.ceil(rkRows.length / 200));
+    ctx.fillStyle = "#e879f9";
+    for (let i = 0; i < rkRows.length; i += krk) {
+      ctx.beginPath();
+      ctx.arc(sx(rkRows[i].x), sy(rkRows[i].y), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // Start marker
+  const r0 = rows[0];
+  ctx.beginPath();
+  ctx.arc(sx(r0.x), sy(r0.y), 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#ffb454";
+  ctx.fill();
+  ctx.strokeStyle = "#0f1420";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Legend
+  const rkSpan = rkRows && rkRows.length > 1
+    ? `<span><span class="swatch" style="background:#e879f9"></span>RK4 (4th-order)</span>` : "";
+  document.getElementById("legend").innerHTML = `
+    <span><span class="swatch" style="background:#4f8cff"></span>Euler approx.</span>
+    <span><span class="swatch" style="background:#36d399"></span>Computed points</span>
+    ${rkSpan}
+    <span><span class="swatch" style="background:#ffb454"></span>Start (x₀, y₀) = (${fmt(r0.x)}, ${fmt(r0.y)})</span>
+  `;
+}
+
+/* ---------- Table ---------- */
+function renderTable(rows) {
+  const tbody = document.querySelector("#dataTable tbody");
+  const k = Math.max(1, Math.ceil(rows.length / 500)); // cap rows for performance
+  let html = "";
+  for (let i = 0; i < rows.length; i += k) {
+    const r = rows[i];
+    html += `<tr><td>${r.i}</td><td>${fmt(r.x)}</td><td>${fmt(r.y)}</td><td>${fmt(r.f)}</td></tr>`;
+  }
+  if (k > 1) html += `<tr><td colspan="4" style="text-align:center;color:var(--muted)">… ${rows.length} rows (showing every ${k}th) …</td></tr>`;
+  tbody.innerHTML = html;
+}
+
+/* ---------- Main ---------- */
+function run() {
+  const status = document.getElementById("status");
+  status.className = "status";
+  try {
+    const fn = compileFormula(document.getElementById("fxy").value);
+    const x0 = parseFloat(document.getElementById("x0").value);
+    const y0 = parseFloat(document.getElementById("y0").value);
+    const h  = parseFloat(document.getElementById("h").value);
+    const n  = parseInt(document.getElementById("n").value, 10);
+
+    if (!isFinite(x0) || !isFinite(y0)) throw new Error("x₀ and y₀ must be numbers.");
+    if (!isFinite(h) || h === 0) throw new Error("Step size h must be a non-zero number.");
+    if (!Number.isInteger(n) || n < 1 || n > 100000) throw new Error("n must be an integer between 1 and 100,000.");
+
+    const rows = euler(fn, x0, y0, h, n);
+    const last = rows[rows.length - 1];
+    if (!isFinite(last.y)) throw new Error(`Solution diverged to ${last.y} at step ${last.i} — try a smaller h or fewer steps.`);
+
+    state = { fn, x0, y0, h, n, rows };
+    renderPlot();
+    renderTable(rows);
+    status.textContent = `✔ ${n} step(s) completed → (x = ${fmt(last.x)}, y = ${fmt(last.y)})`;
+    status.className = "status ok";
+  } catch (err) {
+    status.textContent = "✖ " + err.message;
+    status.className = "status error";
+  }
+}
+
+/* ---------- Render helpers (used by Run, toggle, and resize) ---------- */
+function renderPlot() {
+  if (!state) return;
+  const showRk = document.getElementById("rk4Toggle").checked;
+  const rkRows = showRk ? rk4(state.fn, state.x0, state.y0, state.h, state.n) : null;
+  drawPlot(state.rows, rkRows);
+}
+
+function downloadCsv(rows, name) {
+  if (!state) { alert("Run the solver first."); return; }
+  const esc = v => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  // Quote the "f(x,y)" header: it contains a comma, so RFC 4180 requires quotes
+  const lines = ['step,x,y,"f(x,y)"'];
+  for (const r of rows) lines.push(`${r.i},${esc(r.x)},${esc(r.y)},${esc(state.fn(r.x, r.y))}`);
+  const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}_x0_${state.x0}_y0_${state.y0}_h_${state.h}_n_${state.n}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+document.getElementById("runBtn").addEventListener("click", run);
+document.querySelectorAll("input").forEach(el =>
+  el.addEventListener("keydown", e => { if (e.key === "Enter") run(); })
+);
+document.getElementById("rk4Toggle").addEventListener("change", renderPlot);
+document.getElementById("csvBtn").addEventListener("click", () =>
+  downloadCsv(state.rows, "euler-method"));
+document.getElementById("csvRkBtn").addEventListener("click", () =>
+  downloadCsv(rk4(state.fn, state.x0, state.y0, state.h, state.n), "rk4-method"));
+window.addEventListener("resize", () => {
+  // Redraw on resize if we already have data (cheap: rerun current inputs only if valid)
+  const tbody = document.querySelector("#dataTable tbody");
+  if (tbody.rows.length) run();
+});
+run(); // initial example: y' = x - y, (0, 1), h = 0.1, n = 50
+</script>
+</body>
+</html>
